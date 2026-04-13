@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Token Cost Calculator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;500;600;700&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            font-family: 'Segoe UI', 'Source Sans 3', -apple-system, sans-serif;
+            background: #f9f9f9;
+            color: #1a1a1a;
+            min-height: 100vh;
+        }
+        .container {
+            padding: 20px 24px;
+            max-width: 780px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        h1 {
+            font-weight: 700;
+            font-size: 1.6rem;
+            color: #0078D4;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .azure-logo {
+            width: 28px;
+            height: 28px;
+        }
+        .subheadline {
+            font-size: 0.88rem;
+            color: #444;
+            line-height: 1.45;
+            margin-bottom: 10px;
+        }
+
+        /* Selectors bar */
+        .selectors-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .selector-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .selector-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #555;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+        .selector-dropdown {
+            padding: 5px 28px 5px 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 0.78rem;
+            font-family: inherit;
+            color: #333;
+            background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E") no-repeat right 8px center;
+            -webkit-appearance: none;
+            appearance: none;
+            cursor: pointer;
+            min-width: 130px;
+        }
+        .selector-dropdown:focus { border-color: #0078D4; outline: none; }
+
+        /* Tier selector */
+        .tier-selector {
+            display: flex;
+            gap: 0;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            overflow: hidden;
+            width: fit-content;
+        }
+        .tier-btn {
+            padding: 5px 14px;
+            border: none;
+            background: #fff;
+            font-size: 0.78rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: #555;
+            font-family: inherit;
+            border-right: 1px solid #ccc;
+            transition: all 150ms;
+        }
+        .tier-btn:last-child { border-right: none; }
+        .tier-btn:hover { background: #f0f6ff; }
+        .tier-btn.active {
+            background: #0078D4;
+            color: #fff;
+        }
+
+        /* Total cost display */
+        .total-cost-display {
+            text-align: center;
+            margin-bottom: 8px;
+            padding: 12px 0;
+            background: #fff;
+            border-radius: 8px;
+            border: 1px solid #e8e8e8;
+        }
+        .total-cost-number {
+            font-size: 2.4rem;
+            font-weight: 700;
+            color: #0078D4;
+            line-height: 1;
+        }
+        .total-cost-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+
+        /* Scroll fade */
+        .scroll-fade { position: relative; }
+        .scroll-fade::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            height: 30px;
+            background: linear-gradient(rgba(255,255,255,0), rgba(255,255,255,1));
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 200ms;
+        }
+        .scroll-fade.has-overflow::after { opacity: 1; }
+        .scroll-fade.scrolled-bottom::after { opacity: 0; }
+
+        /* Bar chart */
+        #cost-chart {
+            margin-bottom: 10px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .bar-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 4px;
+            height: 22px;
+        }
+        .bar-label {
+            width: 140px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #333;
+            text-align: right;
+            padding-right: 10px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex-shrink: 0;
+        }
+        .bar-track {
+            flex: 1;
+            height: 18px;
+            background: #eee;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 500ms ease;
+            min-width: 0;
+        }
+        .bar-value {
+            font-size: 0.7rem;
+            color: #666;
+            margin-left: 8px;
+            white-space: nowrap;
+            flex-shrink: 0;
+            min-width: 55px;
+        }
+
+        /* Controls */
+        .controls {
+            border-top: 2px solid #0078D4;
+            padding-top: 10px;
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .control-group {
+            margin-bottom: 8px;
+            flex-shrink: 0;
+        }
+        .control-group.model-group {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0;
+        }
+        .model-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+        .control-group-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            line-height: 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .reset-btn {
+            font-size: 9px;
+            color: #999;
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            padding: 0 4px;
+            cursor: pointer;
+            font-family: inherit;
+            line-height: 14px;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        .reset-btn:hover { color: #333; border-color: #999; }
+
+        /* Total tokens input */
+        .total-tokens-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .total-tokens-input {
+            width: 150px;
+            padding: 4px 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: inherit;
+            height: 28px;
+        }
+        .total-tokens-input:focus { border-color: #0078D4; outline: none; }
+        .preset-btn {
+            padding: 3px 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 0.72rem;
+            cursor: pointer;
+            font-family: inherit;
+            color: #333;
+        }
+        .preset-btn:hover { background: #f0f6ff; }
+        .preset-btn.active { background: #0078D4; color: #fff; border-color: #0078D4; }
+
+        /* Split slider */
+        .split-labels-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .split-slider-track {
+            flex: 1;
+            min-width: 0;
+            position: relative;
+            height: 22px;
+        }
+        .split-visual-bar {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            left: 0; right: 0;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            display: flex;
+            pointer-events: none;
+        }
+        .split-seg-input { background: #0078D4; }
+        .split-seg-cached { background: #50E6FF; }
+        .split-seg-output { background: #7FBA00; }
+        .split-slider-track input[type=range] {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent !important;
+            pointer-events: none;
+            margin: 0;
+            z-index: 3;
+        }
+        .split-slider-track input[type=range]::-webkit-slider-thumb { pointer-events: auto; }
+        .split-slider-track input[type=range]::-moz-range-thumb { pointer-events: auto; }
+        .split-slider-track input[type=range]::-webkit-slider-runnable-track { background: transparent; }
+        .split-slider-track input[type=range]::-moz-range-track { background: transparent; }
+
+        /* Range slider styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #eee;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #0078D4;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+            margin-top: -3px;
+            position: relative;
+            z-index: 2;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #0078D4;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            height: 8px;
+            border-radius: 4px;
+        }
+        input[type=range]::-moz-range-track {
+            height: 8px;
+            border-radius: 4px;
+            background: #eee;
+        }
+
+        /* Model sliders */
+        .model-slider-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 3px;
+        }
+        .model-slider-label {
+            width: 130px;
+            font-size: 0.72rem;
+            color: #444;
+            flex-shrink: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .model-slider-track { flex: 1; margin: 0 6px; }
+        .model-slider-value {
+            width: 50px;
+            font-size: 0.72rem;
+            color: #333;
+            text-align: right;
+            flex-shrink: 0;
+        }
+        .model-remove-btn {
+            width: 18px;
+            height: 18px;
+            border: none;
+            background: none;
+            color: #999;
+            font-size: 0.85rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 18px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .model-remove-btn:hover { color: #e81123; }
+
+        /* Add model */
+        .add-model-row { margin-top: 8px; position: relative; }
+        .add-model-btn {
+            padding: 5px 12px;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            background: #fff;
+            font-size: 12px;
+            cursor: pointer;
+            color: #666;
+            font-family: inherit;
+        }
+        .add-model-btn:hover { border-color: #0078D4; color: #0078D4; }
+        .model-dropdown {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+            z-index: 10;
+            max-height: 220px;
+            overflow-y: auto;
+            display: none;
+            min-width: 200px;
+        }
+        .model-dropdown.open { display: block; }
+        .model-dropdown-item {
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            color: #333;
+        }
+        .model-dropdown-item:hover { background: #f0f6ff; }
+        .model-dropdown-header {
+            padding: 6px 12px 3px;
+            font-size: 10px;
+            font-weight: 600;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        /* Bottom row */
+        .bottom-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 8px;
+            flex-shrink: 0;
+        }
+        .source {
+            font-size: 11px;
+            color: #888;
+            text-align: right;
+            max-width: 65%;
+            margin-left: auto;
+        }
+        .source a { color: #0078D4; text-decoration: none; }
+        .source a:hover { text-decoration: underline; }
+
+        /* Mobile */
+        @media (max-width: 540px) {
+            .container { padding: 12px; }
+            h1 { font-size: 1.2rem; }
+            .subheadline { font-size: 0.75rem; margin-bottom: 6px; }
+            .selectors-bar { gap: 6px; margin-bottom: 8px; }
+            .selector-dropdown { min-width: 100px; font-size: 0.7rem; padding: 4px 24px 4px 6px; }
+            .selector-label { font-size: 9px; }
+            .tier-btn { padding: 3px 8px; font-size: 0.7rem; }
+            .total-cost-display { padding: 8px 0; margin-bottom: 6px; }
+            .total-cost-number { font-size: 1.6rem; }
+            .total-cost-label { font-size: 9px; }
+            .bar-row { height: 18px; margin-bottom: 2px; }
+            .bar-label { width: 90px; font-size: 0.62rem; padding-right: 5px; }
+            .bar-track { height: 14px; }
+            .bar-value { font-size: 0.58rem; min-width: 38px; margin-left: 5px; }
+            .controls { padding-top: 8px; }
+            .control-group { margin-bottom: 5px; }
+            .control-group-title { font-size: 9px; }
+            .total-tokens-row { gap: 4px; }
+            .preset-btn { padding: 2px 6px; font-size: 0.62rem; }
+            .total-tokens-input { width: auto; height: 24px; font-size: 11px; }
+            .split-labels-row { font-size: 9px; }
+            .model-slider-row { margin-bottom: 1px; height: 22px; }
+            .model-slider-label { width: 85px; font-size: 0.6rem; }
+            .model-slider-value { font-size: 0.6rem; width: 34px; }
+            .model-remove-btn { width: 14px; height: 14px; font-size: 0.7rem; }
+            input[type=range] { height: 6px; }
+            input[type=range]::-webkit-slider-thumb { width: 12px; height: 12px; }
+            input[type=range]::-moz-range-thumb { width: 12px; height: 12px; }
+            .add-model-btn { font-size: 10px; padding: 3px 8px; }
+            .source { font-size: 9px; max-width: 75%; }
+            .tier-btn { padding: 4px 10px; font-size: 0.7rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header-row">
+            <h1>
+                <svg class="azure-logo" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg">
+                    <defs><linearGradient id="az-grad" x1="58.97" y1="7.64" x2="30.36" y2="90.18" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#114a8b"/><stop offset="1" stop-color="#0669bc"/></linearGradient><linearGradient id="az-grad2" x1="60" y1="10" x2="45" y2="85" gradientUnits="userSpaceOnUse"><stop offset="0" stop-opacity=".3"/><stop offset=".07" stop-opacity=".2"/><stop offset=".32" stop-opacity=".1"/><stop offset=".62" stop-opacity=".05"/><stop offset="1" stop-opacity="0"/></linearGradient><linearGradient id="az-grad3" x1="38" y1="6" x2="68" y2="90" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#3ccbf4"/><stop offset="1" stop-color="#2892df"/></linearGradient></defs>
+                    <path d="M33.34 6.54h26.04L32.5 88.74a4.7 4.7 0 01-4.46 3.22H8.86a4.72 4.72 0 01-4.46-6.26L30.88 9.76a4.7 4.7 0 014.46-3.22z" fill="url(#az-grad)"/>
+                    <path d="M67.34 61.77H28.56a2.17 2.17 0 00-1.48 3.75l27.14 25.18a4.73 4.73 0 003.22 1.26h22.38z" fill="url(#az-grad3)"/>
+                    <path d="M33.34 6.54a4.66 4.66 0 00-4.5 3.32L3.43 85.7a4.7 4.7 0 004.42 6.26h19.7a4.89 4.89 0 003.9-3.22L40.2 64.1l19.54 18.14a4.78 4.78 0 003.08 1.26h22.38L66.3 44.54 46.2 6.54z" fill="url(#az-grad2)"/>
+                </svg>
+                Azure Token Cost Calculator
+            </h1>
+        </div>
+
+        <p class="subheadline">Estimate token costs across Azure OpenAI and Azure AI Foundry models. Adjust total tokens, input/cached/output split, and model mix to compare costs across deployment tiers.</p>
+
+        <div class="selectors-bar">
+            <div class="selector-group">
+                <span class="selector-label">Region</span>
+                <select class="selector-dropdown" id="region-selector">
+                    <option value="australiaeast" selected>Australia East</option>
+                    <option value="eastus">East US</option>
+                    <option value="eastus2">East US 2</option>
+                    <option value="westus">West US</option>
+                    <option value="westus3">West US 3</option>
+                    <option value="centralus">Central US</option>
+                    <option value="northcentralus">North Central US</option>
+                    <option value="southcentralus">South Central US</option>
+                    <option value="canadaeast">Canada East</option>
+                    <option value="canadacentral">Canada Central</option>
+                    <option value="uksouth">UK South</option>
+                    <option value="westeurope">West Europe</option>
+                    <option value="northeurope">North Europe</option>
+                    <option value="francecentral">France Central</option>
+                    <option value="germanywestcentral">Germany West Central</option>
+                    <option value="swedencentral">Sweden Central</option>
+                    <option value="switzerlandnorth">Switzerland North</option>
+                    <option value="norwayeast">Norway East</option>
+                    <option value="japaneast">Japan East</option>
+                    <option value="koreacentral">Korea Central</option>
+                    <option value="southeastasia">Southeast Asia</option>
+                    <option value="eastasia">East Asia</option>
+                    <option value="centralindia">Central India</option>
+                    <option value="brazilsouth">Brazil South</option>
+                    <option value="southafricanorth">South Africa North</option>
+                    <option value="uaenorth">UAE North</option>
+                </select>
+            </div>
+
+            <div class="selector-group">
+                <span class="selector-label">Currency</span>
+                <select class="selector-dropdown" id="currency-selector">
+                    <option value="AUD" selected>AUD (A$)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                    <option value="GBP">GBP (£)</option>
+                    <option value="CAD">CAD (C$)</option>
+                    <option value="JPY">JPY (¥)</option>
+                    <option value="INR">INR (₹)</option>
+                    <option value="BRL">BRL (R$)</option>
+                    <option value="KRW">KRW (₩)</option>
+                    <option value="SGD">SGD (S$)</option>
+                    <option value="CHF">CHF (Fr)</option>
+                    <option value="SEK">SEK (kr)</option>
+                    <option value="NOK">NOK (kr)</option>
+                    <option value="NZD">NZD (NZ$)</option>
+                    <option value="ZAR">ZAR (R)</option>
+                    <option value="AED">AED (د.إ)</option>
+                </select>
+            </div>
+
+            <div class="selector-group">
+                <span class="selector-label">Tier</span>
+                <div class="tier-selector" id="tier-selector">
+                    <button class="tier-btn active" data-tier="global">Global</button>
+                    <button class="tier-btn" data-tier="datazone">Data Zone</button>
+                    <button class="tier-btn" data-tier="regional">Regional</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="total-cost-display">
+            <div class="total-cost-number" id="total-cost">A$0</div>
+            <div class="total-cost-label">Estimated total cost with these specs</div>
+            <div id="currency-note" style="font-size:10px;color:#999;margin-top:3px;">Region: Australia East · 1 USD ≈ 1.555 AUD</div>
+        </div>
+
+        <div id="cost-chart" class="scroll-fade"></div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="control-group-title">Total Tokens <button class="reset-btn" id="reset-tokens">Reset</button></div>
+                <div class="total-tokens-row">
+                    <input type="text" class="total-tokens-input" id="total-tokens-input" value="10B">
+                    <button class="preset-btn" data-value="1000000000">1B</button>
+                    <button class="preset-btn active" data-value="10000000000">10B</button>
+                    <button class="preset-btn" data-value="100000000000">100B</button>
+                    <button class="preset-btn" data-value="1000000000000">1T</button>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="control-group-title">Token Type Split (Est.) <button class="reset-btn" id="reset-split">Reset</button></div>
+                <div id="split-sliders"></div>
+            </div>
+
+            <div class="control-group model-group">
+                <div class="control-group-title">Model Distribution <button class="reset-btn" id="reset-models">Reset</button></div>
+                <div class="model-scroll scroll-fade">
+                    <div id="model-sliders"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-row">
+            <div class="add-model-row">
+                <button class="add-model-btn" id="add-model-btn">+ Add model</button>
+                <div class="model-dropdown" id="model-dropdown"></div>
+            </div>
+            <p class="source">Prices are estimates. Check <a href="https://azure.microsoft.com/en-us/pricing/details/azure-openai/" target="_blank">Azure OpenAI Pricing</a> and <a href="https://azure.microsoft.com/en-us/pricing/details/ai-foundry-models/aoai/" target="_blank">AI Foundry Pricing</a> for current rates.</p>
+        </div>
+    </div>
+
+<script>
+// === MODEL DATA ===
+// Pricing per 1M tokens: { input, cached, output }
+// Tiers: global, datazone, regional (null = not available)
+const MODELS = {
+    // --- Azure OpenAI ---
+    'gpt-5.4':         { name: 'GPT-5.4',         group: 'aoai',     global: { input: 2.50,  cached: 0.25,   output: 15.00 }, datazone: { input: 2.50,  cached: 0.25,   output: 15.00 }, regional: null },
+    'gpt-5':           { name: 'GPT-5',            group: 'aoai',     global: { input: 1.25,  cached: 0.125,  output: 10.00 }, datazone: { input: 1.25,  cached: 0.125,  output: 10.00 }, regional: null },
+    'gpt-5-mini':      { name: 'GPT-5 Mini',       group: 'aoai',     global: { input: 0.25,  cached: 0.025,  output: 2.00  }, datazone: { input: 0.25,  cached: 0.025,  output: 2.00  }, regional: null },
+    'gpt-5-nano':      { name: 'GPT-5 Nano',       group: 'aoai',     global: { input: 0.05,  cached: 0.005,  output: 0.40  }, datazone: { input: 0.05,  cached: 0.005,  output: 0.40  }, regional: null },
+    'gpt-4.1':         { name: 'GPT-4.1',          group: 'aoai',     global: { input: 2.00,  cached: 0.50,   output: 8.00  }, datazone: { input: 2.00,  cached: 0.50,   output: 8.00  }, regional: { input: 2.00,  cached: 0.50,   output: 8.00  } },
+    'gpt-4.1-mini':    { name: 'GPT-4.1 Mini',     group: 'aoai',     global: { input: 0.40,  cached: 0.10,   output: 1.60  }, datazone: { input: 0.40,  cached: 0.10,   output: 1.60  }, regional: { input: 0.40,  cached: 0.10,   output: 1.60  } },
+    'gpt-4.1-nano':    { name: 'GPT-4.1 Nano',     group: 'aoai',     global: { input: 0.10,  cached: 0.025,  output: 0.40  }, datazone: { input: 0.10,  cached: 0.025,  output: 0.40  }, regional: { input: 0.10,  cached: 0.025,  output: 0.40  } },
+    'o3':              { name: 'o3',                group: 'reasoning', global: { input: 2.00,  cached: 0.50,   output: 8.00  }, datazone: { input: 2.00,  cached: 0.50,   output: 8.00  }, regional: { input: 2.00,  cached: 0.50,   output: 8.00  } },
+    'o4-mini':         { name: 'o4-mini',           group: 'reasoning', global: { input: 1.10,  cached: 0.275,  output: 4.40  }, datazone: { input: 1.10,  cached: 0.275,  output: 4.40  }, regional: { input: 1.10,  cached: 0.275,  output: 4.40  } },
+    'o3-mini':         { name: 'o3-mini',           group: 'reasoning', global: { input: 1.10,  cached: 0.55,   output: 4.40  }, datazone: { input: 1.10,  cached: 0.55,   output: 4.40  }, regional: { input: 1.10,  cached: 0.55,   output: 4.40  } },
+    'gpt-4o':          { name: 'GPT-4o',            group: 'aoai',     global: { input: 2.50,  cached: 1.25,   output: 10.00 }, datazone: { input: 2.50,  cached: 1.25,   output: 10.00 }, regional: { input: 2.50,  cached: 1.25,   output: 10.00 } },
+    'gpt-4o-mini':     { name: 'GPT-4o Mini',       group: 'aoai',     global: { input: 0.15,  cached: 0.075,  output: 0.60  }, datazone: { input: 0.15,  cached: 0.075,  output: 0.60  }, regional: { input: 0.15,  cached: 0.075,  output: 0.60  } },
+    'o1':              { name: 'o1',                group: 'reasoning', global: { input: 15.00, cached: 7.50,   output: 60.00 }, datazone: { input: 15.00, cached: 7.50,   output: 60.00 }, regional: { input: 15.00, cached: 7.50,   output: 60.00 } },
+    'gpt-4-turbo':     { name: 'GPT-4 Turbo',      group: 'aoai',     global: { input: 10.00, cached: 10.00,  output: 30.00 }, datazone: null, regional: { input: 10.00, cached: 10.00,  output: 30.00 } },
+    'gpt-4.5-preview': { name: 'GPT-4.5 Preview',  group: 'aoai',     global: { input: 75.00, cached: 37.50,  output: 150.00}, datazone: null, regional: null },
+    'gpt-3.5-turbo':   { name: 'GPT-3.5 Turbo',    group: 'aoai',     global: { input: 0.50,  cached: 0.50,   output: 1.50  }, datazone: null, regional: { input: 0.50,  cached: 0.50,   output: 1.50  } },
+
+    // --- Azure AI Foundry Third-Party ---
+    'deepseek-v3':     { name: 'DeepSeek V3.2',    group: 'deepseek', global: { input: 0.27,  cached: 0.027,  output: 1.10  }, datazone: null, regional: null },
+    'deepseek-r1':     { name: 'DeepSeek R1',      group: 'deepseek', global: { input: 0.55,  cached: 0.14,   output: 2.19  }, datazone: null, regional: null },
+    'llama-3.1-8b':    { name: 'Llama 3.1 8B',     group: 'meta',     global: { input: 0.02,  cached: 0.02,   output: 0.05  }, datazone: null, regional: null },
+    'llama-3.2-1b':    { name: 'Llama 3.2 1B',     group: 'meta',     global: { input: 0.02,  cached: 0.02,   output: 0.02  }, datazone: null, regional: null },
+    'mistral-small':   { name: 'Mistral Small 3.1', group: 'mistral', global: { input: 0.10,  cached: 0.10,   output: 0.30  }, datazone: null, regional: null },
+    'mistral-nemo':    { name: 'Mistral Nemo',     group: 'mistral',  global: { input: 0.02,  cached: 0.02,   output: 0.04  }, datazone: null, regional: null },
+    'phi-4-mini':      { name: 'Phi-4 Mini',       group: 'microsoft', global: { input: 0.22,  cached: 0.22,   output: 0.22  }, datazone: null, regional: null },
+};
+
+const GROUP_COLORS = {
+    aoai:      '#0078D4',
+    reasoning: '#50E6FF',
+    deepseek:  '#6B4EAA',
+    meta:      '#2A54A3',
+    mistral:   '#FF7000',
+    microsoft: '#7FBA00',
+};
+
+const GROUP_LABELS = {
+    aoai:      'Azure OpenAI',
+    reasoning: 'Azure OpenAI (Reasoning)',
+    deepseek:  'DeepSeek',
+    meta:      'Meta / Llama',
+    mistral:   'Mistral',
+    microsoft: 'Microsoft',
+};
+
+// === CURRENCIES ===
+const CURRENCIES = {
+    USD: { symbol: '$',   rate: 1.000,  name: 'US Dollar' },
+    AUD: { symbol: 'A$',  rate: 1.555,  name: 'Australian Dollar' },
+    EUR: { symbol: '€',   rate: 0.920,  name: 'Euro' },
+    GBP: { symbol: '£',   rate: 0.790,  name: 'British Pound' },
+    CAD: { symbol: 'C$',  rate: 1.380,  name: 'Canadian Dollar' },
+    JPY: { symbol: '¥',   rate: 149.50, name: 'Japanese Yen' },
+    INR: { symbol: '₹',   rate: 83.50,  name: 'Indian Rupee' },
+    BRL: { symbol: 'R$',  rate: 5.10,   name: 'Brazilian Real' },
+    KRW: { symbol: '₩',   rate: 1340.0, name: 'Korean Won' },
+    SGD: { symbol: 'S$',  rate: 1.345,  name: 'Singapore Dollar' },
+    CHF: { symbol: 'Fr',  rate: 0.880,  name: 'Swiss Franc' },
+    SEK: { symbol: 'kr',  rate: 10.60,  name: 'Swedish Krona' },
+    NOK: { symbol: 'kr',  rate: 10.80,  name: 'Norwegian Krone' },
+    NZD: { symbol: 'NZ$', rate: 1.680,  name: 'New Zealand Dollar' },
+    ZAR: { symbol: 'R',   rate: 18.50,  name: 'South African Rand' },
+    AED: { symbol: 'د.إ', rate: 3.673,  name: 'UAE Dirham' },
+};
+
+// === REGIONS ===
+// Which models are available per region (simplified — most Azure OpenAI models are broadly available)
+const REGIONS = {
+    australiaeast:     { name: 'Australia East',       datazone: 'APAC' },
+    eastus:            { name: 'East US',              datazone: 'US' },
+    eastus2:           { name: 'East US 2',            datazone: 'US' },
+    westus:            { name: 'West US',              datazone: 'US' },
+    westus3:           { name: 'West US 3',            datazone: 'US' },
+    centralus:         { name: 'Central US',           datazone: 'US' },
+    northcentralus:    { name: 'North Central US',     datazone: 'US' },
+    southcentralus:    { name: 'South Central US',     datazone: 'US' },
+    canadaeast:        { name: 'Canada East',          datazone: 'US' },
+    canadacentral:     { name: 'Canada Central',       datazone: 'US' },
+    uksouth:           { name: 'UK South',             datazone: 'EU' },
+    westeurope:        { name: 'West Europe',          datazone: 'EU' },
+    northeurope:       { name: 'North Europe',         datazone: 'EU' },
+    francecentral:     { name: 'France Central',       datazone: 'EU' },
+    germanywestcentral:{ name: 'Germany West Central', datazone: 'EU' },
+    swedencentral:     { name: 'Sweden Central',       datazone: 'EU' },
+    switzerlandnorth:  { name: 'Switzerland North',    datazone: 'EU' },
+    norwayeast:        { name: 'Norway East',          datazone: 'EU' },
+    japaneast:         { name: 'Japan East',           datazone: 'APAC' },
+    koreacentral:      { name: 'Korea Central',        datazone: 'APAC' },
+    southeastasia:     { name: 'Southeast Asia',       datazone: 'APAC' },
+    eastasia:          { name: 'East Asia',            datazone: 'APAC' },
+    centralindia:      { name: 'Central India',        datazone: 'APAC' },
+    brazilsouth:       { name: 'Brazil South',         datazone: 'US' },
+    southafricanorth:  { name: 'South Africa North',   datazone: 'EU' },
+    uaenorth:          { name: 'UAE North',            datazone: 'EU' },
+};
+
+// === DEFAULTS ===
+const DEFAULTS = {
+    totalTokens: 10_000_000_000,
+    tokenSplit: { input: 0.25, cached: 0.50, output: 0.25 },
+    tier: 'global',
+    currency: 'AUD',
+    region: 'australiaeast',
+    activeModels: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'o4-mini', 'gpt-5', 'deepseek-v3'],
+    modelDist: {
+        'gpt-4.1':      0.30,
+        'gpt-4.1-mini': 0.25,
+        'gpt-4o':       0.15,
+        'o4-mini':      0.10,
+        'gpt-5':        0.10,
+        'deepseek-v3':  0.10,
+    }
+};
+
+// === STATE ===
+const state = {
+    totalTokens: DEFAULTS.totalTokens,
+    tokenSplit: { ...DEFAULTS.tokenSplit },
+    tier: DEFAULTS.tier,
+    currency: DEFAULTS.currency,
+    region: DEFAULTS.region,
+    activeModels: [...DEFAULTS.activeModels],
+    modelDist: { ...DEFAULTS.modelDist },
+};
+
+// === HELPERS ===
+function getModelColor(modelId) {
+    return GROUP_COLORS[MODELS[modelId].group] || '#999';
+}
+
+function getModelPricing(modelId) {
+    const model = MODELS[modelId];
+    const pricing = model[state.tier];
+    if (pricing) return pricing;
+    // Fallback to global if tier not available
+    return model.global;
+}
+
+function fmtPct(n) {
+    if (n > 0 && n < 1) return '<1';
+    return Math.round(n).toString();
+}
+
+function formatCurrency(n) {
+    if (n < 0) n = 0;
+    const curr = CURRENCIES[state.currency];
+    const converted = n * curr.rate;
+    const sym = curr.symbol;
+    function fmt(val) {
+        const r = Math.round(val);
+        if (r === val || Math.abs(val - r) < 0.05) return r.toString();
+        return val.toFixed(1);
+    }
+    if (converted >= 1e9) return sym + fmt(converted / 1e9) + 'B';
+    if (converted >= 1e6) return sym + fmt(converted / 1e6) + 'M';
+    if (converted >= 1e3) return sym + fmt(converted / 1e3) + 'K';
+    if (converted >= 1)   return sym + Math.round(converted);
+    if (converted > 0)    return sym + converted.toFixed(2);
+    return sym + '0';
+}
+
+function formatTokens(n) {
+    if (n >= 1e12) return (n / 1e12).toFixed(1) + 'T';
+    if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return n.toFixed(0);
+}
+
+function parseTokenInput(str) {
+    str = str.trim().toUpperCase().replace(/[$,]/g, '');
+    const multipliers = { K: 1e3, M: 1e6, B: 1e9, T: 1e12 };
+    for (const [suffix, mult] of Object.entries(multipliers)) {
+        if (str.endsWith(suffix)) {
+            return parseFloat(str.slice(0, -1)) * mult;
+        }
+    }
+    return parseFloat(str);
+}
+
+// === COST CALCULATION ===
+function calculateCosts() {
+    const costs = {};
+    for (const modelId of state.activeModels) {
+        const pricing = getModelPricing(modelId);
+        const dist = state.modelDist[modelId] || 0;
+        const tokens = state.totalTokens * dist;
+        const inputCost = tokens * state.tokenSplit.input * pricing.input / 1e6;
+        const cachedCost = tokens * state.tokenSplit.cached * pricing.cached / 1e6;
+        const outputCost = tokens * state.tokenSplit.output * pricing.output / 1e6;
+        costs[modelId] = { total: inputCost + cachedCost + outputCost, tokens };
+    }
+    return costs;
+}
+
+// === 100% CONSTRAINT ===
+function redistributeSliders(collection, changedKey, newValue) {
+    const oldValue = collection[changedKey];
+    const delta = newValue - oldValue;
+    const others = Object.keys(collection).filter(k => k !== changedKey && state.activeModels.includes(k));
+
+    const othersTotal = others.reduce((sum, k) => sum + collection[k], 0);
+    collection[changedKey] = newValue;
+
+    if (othersTotal > 0) {
+        for (const k of others) {
+            collection[k] = Math.max(0, collection[k] - (delta * collection[k] / othersTotal));
+        }
+    } else if (others.length > 0) {
+        const remaining = 1 - newValue;
+        for (const k of others) {
+            collection[k] = remaining / others.length;
+        }
+    }
+
+    // Normalize
+    const activeKeys = [changedKey, ...others];
+    const total = activeKeys.reduce((s, k) => s + collection[k], 0);
+    if (total > 0) {
+        for (const k of activeKeys) {
+            collection[k] = collection[k] / total;
+        }
+    }
+}
+
+// === RENDERING ===
+function sliderFillBg(pct, color) {
+    return `linear-gradient(to right, ${color} 0%, ${color} ${pct}%, #eee ${pct}%, #eee 100%)`;
+}
+
+function updateDisplay() {
+    const costs = calculateCosts();
+    const totalCost = Object.values(costs).reduce((s, c) => s + c.total, 0);
+    document.getElementById('total-cost').textContent = formatCurrency(totalCost);
+
+    // Update currency note
+    const curr = CURRENCIES[state.currency];
+    const regionName = REGIONS[state.region]?.name || state.region;
+    const noteEl = document.getElementById('currency-note');
+    if (state.currency === 'USD') {
+        noteEl.textContent = `Region: ${regionName} · Prices in USD`;
+    } else {
+        noteEl.textContent = `Region: ${regionName} · 1 USD ≈ ${curr.rate} ${state.currency}`;
+    }
+
+    // Bar chart
+    const chartEl = document.getElementById('cost-chart');
+    const sorted = [...state.activeModels].sort((a, b) => costs[b].total - costs[a].total);
+    const maxCost = Math.max(...sorted.map(id => costs[id].total), 1);
+    chartEl.innerHTML = sorted.map(modelId => {
+        const model = MODELS[modelId];
+        const cost = costs[modelId];
+        const pct = totalCost > 0 ? (cost.total / maxCost) * 100 : 0;
+        const color = getModelColor(modelId);
+        return `<div class="bar-row">
+            <div class="bar-label" title="${model.name}">${model.name}</div>
+            <div class="bar-track">
+                <div class="bar-fill" style="width: ${pct}%; background: ${color}"></div>
+            </div>
+            <div class="bar-value">${formatCurrency(cost.total)}</div>
+        </div>`;
+    }).join('');
+
+    // Split sliders
+    const h1El = document.getElementById('split-handle-1');
+    const h2El = document.getElementById('split-handle-2');
+    if (h1El && h2El) {
+        const inputPct = state.tokenSplit.input * 100;
+        const cachedPct = state.tokenSplit.cached * 100;
+        const outputPct = state.tokenSplit.output * 100;
+        h1El.value = inputPct;
+        h2El.value = inputPct + cachedPct;
+        document.getElementById('seg-input').style.width = inputPct + '%';
+        document.getElementById('seg-cached').style.width = cachedPct + '%';
+        document.getElementById('seg-output').style.width = outputPct + '%';
+        document.getElementById('split-input-lbl').textContent = fmtPct(inputPct) + '%';
+        document.getElementById('split-cached-lbl').textContent = fmtPct(cachedPct) + '%';
+        document.getElementById('split-output-lbl').textContent = fmtPct(outputPct) + '%';
+    }
+
+    // Model sliders
+    document.querySelectorAll('#model-sliders input[type=range]').forEach(slider => {
+        const modelId = slider.dataset.modelId;
+        const pct = (state.modelDist[modelId] || 0) * 100;
+        const color = getModelColor(modelId);
+        slider.value = pct;
+        slider.style.background = sliderFillBg(pct, color);
+        const valueEl = slider.closest('.model-slider-row').querySelector('.model-slider-value');
+        if (valueEl) valueEl.textContent = fmtPct(pct) + '%';
+    });
+
+    updateScrollFades();
+}
+
+function render() {
+    renderSplitSliders();
+    renderModelSliders();
+    updateDisplay();
+}
+
+function updateScrollFades() {
+    document.querySelectorAll('.scroll-fade').forEach(el => {
+        const hasOverflow = el.scrollHeight > el.clientHeight + 2;
+        const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 2;
+        el.classList.toggle('has-overflow', hasOverflow);
+        el.classList.toggle('scrolled-bottom', atBottom);
+    });
+}
+
+document.addEventListener('scroll', (e) => {
+    if (e.target.classList && e.target.classList.contains('scroll-fade')) {
+        updateScrollFades();
+    }
+}, true);
+
+function renderSplitSliders() {
+    const container = document.getElementById('split-sliders');
+    const inputPct = state.tokenSplit.input * 100;
+    const cachedPct = state.tokenSplit.cached * 100;
+    const outputPct = state.tokenSplit.output * 100;
+
+    container.innerHTML = `<div class="split-labels-row">
+        <span style="color:#0078D4"><span id="split-input-lbl">${fmtPct(inputPct)}%</span> Input</span>
+        <span style="color:#50E6FF"><span id="split-cached-lbl">${fmtPct(cachedPct)}%</span> Cached</span>
+        <span style="color:#7FBA00"><span id="split-output-lbl">${fmtPct(outputPct)}%</span> Output</span>
+    </div>
+    <div class="split-slider-track">
+        <div class="split-visual-bar">
+            <div class="split-seg-input" id="seg-input" style="width:${inputPct}%"></div>
+            <div class="split-seg-cached" id="seg-cached" style="width:${cachedPct}%"></div>
+            <div class="split-seg-output" id="seg-output" style="width:${outputPct}%"></div>
+        </div>
+        <input type="range" min="0" max="100" step="0.5" value="${inputPct}" id="split-handle-1">
+        <input type="range" min="0" max="100" step="0.5" value="${inputPct + cachedPct}" id="split-handle-2">
+    </div>`;
+
+    document.getElementById('split-handle-1').addEventListener('input', (e) => {
+        let h1 = parseFloat(e.target.value);
+        const h2 = parseFloat(document.getElementById('split-handle-2').value);
+        if (h1 > h2) h1 = h2;
+        e.target.value = h1;
+        state.tokenSplit.input = h1 / 100;
+        state.tokenSplit.cached = (h2 - h1) / 100;
+        state.tokenSplit.output = (100 - h2) / 100;
+        updateDisplay();
+    });
+
+    document.getElementById('split-handle-2').addEventListener('input', (e) => {
+        let h2 = parseFloat(e.target.value);
+        const h1 = parseFloat(document.getElementById('split-handle-1').value);
+        if (h2 < h1) h2 = h1;
+        e.target.value = h2;
+        state.tokenSplit.input = h1 / 100;
+        state.tokenSplit.cached = (h2 - h1) / 100;
+        state.tokenSplit.output = (100 - h2) / 100;
+        updateDisplay();
+    });
+}
+
+function renderModelSliders() {
+    const container = document.getElementById('model-sliders');
+    container.innerHTML = state.activeModels.map(modelId => {
+        const model = MODELS[modelId];
+        const pct = (state.modelDist[modelId] || 0) * 100;
+        const color = getModelColor(modelId);
+        const tierAvail = model[state.tier] ? '' : ' <span style="color:#e81123;font-size:9px" title="Not available in this tier">⚠</span>';
+        return `<div class="model-slider-row">
+            <div class="model-slider-label" title="${model.name}">${model.name}${tierAvail}</div>
+            <div class="model-slider-track">
+                <input type="range" min="0" max="100" step="0.01" value="${pct}" data-model-id="${modelId}" style="background: ${sliderFillBg(pct, color)}">
+            </div>
+            <div class="model-slider-value">${fmtPct(pct)}%</div>
+            <button class="model-remove-btn" data-model-id="${modelId}" title="Remove">&times;</button>
+        </div>`;
+    }).join('');
+
+    container.querySelectorAll('input[type=range]').forEach(slider => {
+        slider.addEventListener('input', (e) => {
+            const modelId = e.target.dataset.modelId;
+            const newPct = parseFloat(e.target.value) / 100;
+            redistributeSliders(state.modelDist, modelId, Math.min(1, Math.max(0, newPct)));
+            updateDisplay();
+        });
+    });
+
+    container.querySelectorAll('.model-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            removeModel(e.target.closest('[data-model-id]').dataset.modelId);
+        });
+    });
+}
+
+// === ADD/REMOVE MODELS ===
+function addModel(modelId) {
+    if (state.activeModels.includes(modelId)) return;
+    state.activeModels.push(modelId);
+    state.modelDist[modelId] = 0;
+    render();
+    closeDropdown();
+}
+
+function removeModel(modelId) {
+    if (state.activeModels.length <= 1) return;
+    state.activeModels = state.activeModels.filter(id => id !== modelId);
+    const share = state.modelDist[modelId] || 0;
+    delete state.modelDist[modelId];
+
+    const remaining = state.activeModels;
+    const total = remaining.reduce((s, id) => s + (state.modelDist[id] || 0), 0);
+    if (total > 0) {
+        for (const id of remaining) {
+            state.modelDist[id] = (state.modelDist[id] || 0) / total;
+        }
+    } else if (remaining.length > 0) {
+        for (const id of remaining) {
+            state.modelDist[id] = 1 / remaining.length;
+        }
+    }
+    render();
+}
+
+function closeDropdown() {
+    document.getElementById('model-dropdown').classList.remove('open');
+}
+
+function buildDropdown() {
+    const dropdown = document.getElementById('model-dropdown');
+    const groups = {};
+    for (const [id, model] of Object.entries(MODELS)) {
+        if (state.activeModels.includes(id)) continue;
+        if (!groups[model.group]) groups[model.group] = [];
+        groups[model.group].push({ id, ...model });
+    }
+
+    let html = '';
+    for (const [group, models] of Object.entries(groups)) {
+        html += `<div class="model-dropdown-header">${GROUP_LABELS[group] || group}</div>`;
+        for (const m of models) {
+            html += `<div class="model-dropdown-item" data-model-id="${m.id}">${m.name}</div>`;
+        }
+    }
+    dropdown.innerHTML = html;
+
+    dropdown.querySelectorAll('.model-dropdown-item').forEach(item => {
+        item.addEventListener('click', () => addModel(item.dataset.modelId));
+    });
+}
+
+// === INIT ===
+function init() {
+    // Region selector
+    document.getElementById('region-selector').addEventListener('change', (e) => {
+        state.region = e.target.value;
+        updateDisplay();
+    });
+
+    // Currency selector
+    document.getElementById('currency-selector').addEventListener('change', (e) => {
+        state.currency = e.target.value;
+        updateDisplay();
+    });
+
+    // Tier buttons
+    document.querySelectorAll('.tier-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tier-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            state.tier = btn.dataset.tier;
+            render();
+        });
+    });
+
+    // Token input
+    const tokenInput = document.getElementById('total-tokens-input');
+    tokenInput.addEventListener('change', () => {
+        const val = parseTokenInput(tokenInput.value);
+        if (!isNaN(val) && val > 0) {
+            state.totalTokens = val;
+            tokenInput.value = formatTokens(val);
+            document.querySelectorAll('.preset-btn').forEach(b => {
+                b.classList.toggle('active', parseFloat(b.dataset.value) === val);
+            });
+            updateDisplay();
+        }
+    });
+
+    // Preset buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const val = parseFloat(btn.dataset.value);
+            state.totalTokens = val;
+            tokenInput.value = formatTokens(val);
+            document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            updateDisplay();
+        });
+    });
+
+    // Reset buttons
+    document.getElementById('reset-tokens').addEventListener('click', () => {
+        state.totalTokens = DEFAULTS.totalTokens;
+        tokenInput.value = formatTokens(DEFAULTS.totalTokens);
+        document.querySelectorAll('.preset-btn').forEach(b => {
+            b.classList.toggle('active', parseFloat(b.dataset.value) === DEFAULTS.totalTokens);
+        });
+        updateDisplay();
+    });
+
+    document.getElementById('reset-split').addEventListener('click', () => {
+        state.tokenSplit = { ...DEFAULTS.tokenSplit };
+        renderSplitSliders();
+        updateDisplay();
+    });
+
+    document.getElementById('reset-models').addEventListener('click', () => {
+        state.activeModels = [...DEFAULTS.activeModels];
+        state.modelDist = { ...DEFAULTS.modelDist };
+        render();
+    });
+
+    // Add model dropdown
+    document.getElementById('add-model-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        buildDropdown();
+        document.getElementById('model-dropdown').classList.toggle('open');
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.add-model-row')) {
+            closeDropdown();
+        }
+    });
+
+    render();
+}
+
+init();
+</script>
+</body>
+</html>
